@@ -2,43 +2,53 @@
     'use strict';
     var module = ng.module('lrInfiniteScroll', []);
 
-    module.directive('lrInfiniteScroll', ['$timeout', function (timeout) {
+    module.directive('lrInfiniteScroll', ['$timeout', '$window', function ($timeout, $window) {
         return{
+            scope: {
+                handler: "&lrInfiniteScroll",
+                scrollThreshold: "@scrollThreshold",
+                timeThreshold: "@timeThreshold",
+            },
             link: function (scope, element, attr) {
-                var
-                    lengthThreshold = attr.scrollThreshold || 50,
-                    timeThreshold = attr.timeThreshold || 400,
-                    handler = scope.$eval(attr.lrInfiniteScroll),
-                    promise = null,
-                    lastRemaining = 9999;
+                scope.scrollThreshold = parseInt(scope.scrollThreshold || 50);
+                scope.timeThreshold = parseInt(scope.timeThreshold || 400);
+                var windowScroll = attr.windowScroll !== undefined ? true : false;
 
-                lengthThreshold = parseInt(lengthThreshold, 10);
-                timeThreshold = parseInt(timeThreshold, 10);
+                var promise = null;
+                var lastRemaining = 9999;
 
-                if (!handler || !ng.isFunction(handler)) {
-                    handler = ng.noop;
-                }
-
-                element.bind('scroll', function () {
-                    var
-                        remaining = element[0].scrollHeight - (element[0].clientHeight + element[0].scrollTop);
+                function onScroll(element) {
+                    var remaining = element.scrollHeight - (element.clientHeight + element.scrollTop);
 
                     //if we have reached the threshold and we scroll down
-                    if (remaining < lengthThreshold && (remaining - lastRemaining) < 0) {
+                    if (remaining < scope.scrollThreshold && (remaining - lastRemaining) < 0) {
 
                         //if there is already a timer running which has no expired yet we have to cancel it and restart the timer
                         if (promise !== null) {
-                            timeout.cancel(promise);
+                            $timeout.cancel(promise);
                         }
-                        promise = timeout(function () {
-                            handler();
+
+                        promise = $timeout(function () {
+                            scope.handler();
                             promise = null;
-                        }, timeThreshold);
+                        }, scope.timeThreshold);
                     }
+
                     lastRemaining = remaining;
+                }
+
+                element.bind('scroll', function () {
+                    onScroll(element[0]);
                 });
+
+                if (windowScroll) {
+                    $window.addEventListener('scroll', function () {
+                        onScroll(document.body);
+                    });
+                }
             }
 
         };
     }]);
 })(angular);
+
